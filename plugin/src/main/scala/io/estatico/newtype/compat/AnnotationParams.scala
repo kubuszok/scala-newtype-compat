@@ -16,10 +16,15 @@ object AnnotationParams:
   /** Extract NewTypeParams from an annotation tree. */
   def extract(annotation: Tree, isSubtype: Boolean)(using Context): NewTypeParams =
     val base = NewTypeParams(isSubtype = isSubtype)
-    annotation match
-      case New(_) => base // @newtype with no args
-      case Apply(New(_), args) => parseArgs(base, args)
-      case _ => base
+    extractArgs(annotation) match
+      case Some(args) => parseArgs(base, args)
+      case None => base
+
+  private def extractArgs(tree: Tree): Option[List[Tree]] = tree match
+    case New(_)              => Some(Nil)
+    case Apply(_, args)      => Some(args)
+    case Select(inner, _)    => extractArgs(inner)
+    case _                   => None
 
   private def parseArgs(base: NewTypeParams, args: List[Tree]): NewTypeParams =
     args.foldLeft(base) { (params, arg) =>
@@ -47,4 +52,5 @@ object AnnotationParams:
     case New(Ident(name))              => Some(name.toString)
     case New(Select(_, name))          => Some(name.toString)
     case Apply(inner, _)               => annotationName(inner)
+    case Select(inner, _)              => annotationName(inner)
     case _                             => None
