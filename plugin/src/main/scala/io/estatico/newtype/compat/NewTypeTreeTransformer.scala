@@ -237,14 +237,28 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
     AnsiColorRegex.replaceAllIn(tree.show, "")
 
   /** Parse a string of Scala statements into a list of trees. */
+  private var counter = new java.util.concurrent.atomic.AtomicLong(0)
+
   private def parseStats(source: String)(using Context): List[Tree] =
-    val virtualSource = SourceFile.virtual(s"<newtype-generated-${java.util.concurrent.atomic.AtomicLong().incrementAndGet()}>", source)
+    val virtualSource = SourceFile.virtual(s"<newtype-generated-${counter.incrementAndGet()}>", source)
     val parser = new Parsers.Parser(virtualSource)
     val tree = parser.parse()
     // The parser returns a PackageDef; extract its stats
-    tree match
+    val stats = tree match
       case PackageDef(_, stats) => stats
       case _ => List(tree)
+    // Strip positions to avoid confusing the compiler when trees from virtual sources
+    // are inserted into the real source's tree
+    stats.map(stripPositions)
+
+  /** Recursively strip source positions from all trees to avoid position conflicts. */
+  private def stripPositions(tree: Tree)(using Context): Tree =
+    import dotty.tools.dotc.util.Spans.NoSpan
+    new UntypedTreeMap:
+      override def transform(tree: Tree)(using Context): Tree =
+        val t = super.transform(tree)
+        if t.isEmpty then t else t.withSpan(NoSpan)
+    .transform(tree)
 
   // --- Override tree traversal to handle stats rewriting ---
 
