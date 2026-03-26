@@ -63,7 +63,7 @@ object NewTypeMacrosTest {
 
   @newtype case class Foo(x: Int)
 
-  @newtype case class Bar(value: String)
+  @io.estatico.newtype.macros.newtype case class Bar(value: String)
 
   @newtype case class Baz[A](xs: List[A])
 
