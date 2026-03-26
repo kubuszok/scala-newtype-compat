@@ -1,0 +1,10 @@
+target/
+.bsp/
+.bloop/
+.metals/
+.idea/
+.vscode/
+.claude/
+memory/
+*.class
+*.log
