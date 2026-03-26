@@ -48,7 +48,7 @@ lazy val tests = project
   .settings(
     name := "newtype-compat-tests",
     publish / skip := true,
-    crossScalaVersions := Seq(scala2_13, scala3Latest),
+    crossScalaVersions := scala2_13 +: scala3Versions,
     scalaVersion := scala3Latest,
     scalacOptions ++= {
       if (scalaVersion.value.startsWith("2."))
