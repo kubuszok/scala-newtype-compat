@@ -1,3 +1,10 @@
+import com.jsuereth.sbtpgp.PgpKeys.publishSigned
+
+// Used to publish snapshots to Maven Central.
+val mavenCentralSnapshots = "Maven Central Snapshots" at "https://central.sonatype.com/repository/maven-snapshots"
+
+// Versions:
+
 val scala2_13 = "2.13.16"
 
 val scala3Versions = Seq(
@@ -13,18 +20,75 @@ val scala3Latest = scala3Versions.last
 
 val newtypeVersion = "0.4.4"
 
-ThisBuild / organization := "com.kubuszok"
-ThisBuild / versionScheme := Some("early-semver")
+// Common settings:
+
+val publishSettings = Seq(
+  organization := "com.kubuszok",
+  homepage := Some(url("https://github.com/MateuszKubuszok/scala-newtype-compat")),
+  organizationHomepage := Some(url("https://kubuszok.com")),
+  licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
+  scmInfo := Some(
+    ScmInfo(
+      url("https://github.com/MateuszKubuszok/scala-newtype-compat/"),
+      "scm:git:git@github.com:MateuszKubuszok/scala-newtype-compat.git"
+    )
+  ),
+  startYear := Some(2026),
+  developers := List(
+    Developer("MateuszKubuszok", "Mateusz Kubuszok", "", url("https://github.com/MateuszKubuszok"))
+  ),
+  pomExtra := (
+    <issueManagement>
+      <system>GitHub issues</system>
+      <url>https://github.com/MateuszKubuszok/scala-newtype-compat/issues</url>
+    </issueManagement>
+  ),
+  publishTo := {
+    if (isSnapshot.value) Some(mavenCentralSnapshots)
+    else localStaging.value
+  },
+  publishMavenStyle := true,
+  Test / publishArtifact := false,
+  pomIncludeRepository := {
+    _ => false
+  },
+  versionScheme := Some("early-semver"),
+  git.useGitDescribe := true,
+  git.uncommittedSignifier := None,
+  // Sonatype ignores isSnapshot setting and only looks at -SNAPSHOT suffix in version:
+  //   https://central.sonatype.org/publish/publish-maven/#performing-a-snapshot-deployment
+  // meanwhile sbt-git used to set up SNAPSHOT if there were uncommitted changes:
+  //   https://github.com/sbt/sbt-git/issues/164
+  // (now this suffix is empty by default) so we need to fix it manually.
+  git.gitUncommittedChanges := git.gitCurrentTags.value.isEmpty,
+  git.uncommittedSignifier := Some("SNAPSHOT")
+)
+
+val noPublishSettings =
+  Seq(publish / skip := true, publishArtifact := false)
+
+// Modules:
 
 lazy val root = project
   .in(file("."))
+  .enablePlugins(GitVersioning, GitBranchPrompt)
+  .settings(publishSettings)
+  .settings(noPublishSettings)
   .settings(
-    publish / skip := true,
-    crossScalaVersions := Nil
+    name := "scala-newtype-compat-root",
+    crossScalaVersions := Nil,
+    commands += Command.command("ci-release") { state =>
+      val extracted = Project.extract(state)
+      val tags = extracted.get(git.gitCurrentTags)
+      val cmd = if (tags.nonEmpty) "publishSigned ; sonaRelease" else "publishSigned"
+      cmd :: state
+    }
   )
   .aggregate(compat, plugin, tests)
 
 lazy val compat = project
+  .enablePlugins(GitVersioning, GitBranchPrompt)
+  .settings(publishSettings)
   .settings(
     name := "newtype-compat",
     crossScalaVersions := scala2_13 +: scala3Versions,
@@ -36,6 +100,8 @@ lazy val compat = project
   )
 
 lazy val plugin = project
+  .enablePlugins(GitVersioning, GitBranchPrompt)
+  .settings(publishSettings)
   .settings(
     name := "newtype-plugin",
     crossScalaVersions := scala3Versions,
@@ -45,9 +111,11 @@ lazy val plugin = project
 
 lazy val tests = project
   .dependsOn(compat)
+  .enablePlugins(GitVersioning, GitBranchPrompt)
+  .settings(publishSettings)
+  .settings(noPublishSettings)
   .settings(
     name := "newtype-compat-tests",
-    publish / skip := true,
     crossScalaVersions := scala2_13 +: scala3Versions,
     scalaVersion := scala3Latest,
     scalacOptions ++= {
