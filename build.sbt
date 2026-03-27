@@ -80,7 +80,7 @@ lazy val root = project
     commands += Command.command("ci-release") { state =>
       val extracted = Project.extract(state)
       val tags = extracted.get(git.gitCurrentTags)
-      val cmd = if (tags.nonEmpty) "publishSigned ; sonaRelease" else "publishSigned"
+      val cmd = if (tags.nonEmpty) "+publishSigned ; sonaRelease" else "+publishSigned"
       cmd :: state
     }
   )
@@ -91,8 +91,8 @@ lazy val compat = project
   .settings(publishSettings)
   .settings(
     name := "newtype-compat",
-    crossScalaVersions := scala2_13 +: scala3Versions,
-    scalaVersion := scala3Latest,
+    crossScalaVersions := Seq(scala2_13, scala3Versions.head),
+    scalaVersion := scala3Versions.head,
     // Empty artifact — no source files, just brings in the dependency
     Compile / sources := Seq.empty,
     // Always depend on the 2.13 artifact (Scala 3 can consume 2.13 jars)
