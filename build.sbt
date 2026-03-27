@@ -104,6 +104,7 @@ lazy val plugin = project
   .settings(publishSettings)
   .settings(
     name := "newtype-plugin",
+    crossVersion := CrossVersion.full,
     crossScalaVersions := scala3Versions,
     scalaVersion := scala3Latest,
     libraryDependencies += "org.scala-lang" %% "scala3-compiler" % scalaVersion.value % Provided
