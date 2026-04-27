@@ -134,6 +134,7 @@ lazy val tests = project
     libraryDependencies ++= Seq(
       "org.scalatest"  %% "scalatest"  % "3.2.19" % Test,
       "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
-      "org.typelevel"  %% "cats-core"  % "2.12.0" % Test
+      "org.typelevel"  %% "cats-core"  % "2.12.0" % Test,
+      "eu.timepit"     %% "refined"    % "0.11.3" % Test
     )
   )
