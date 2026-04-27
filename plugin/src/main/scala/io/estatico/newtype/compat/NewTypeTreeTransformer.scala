@@ -19,32 +19,51 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
 
   /** Transform a list of statements, expanding @newtype/@newsubtype classes. */
   private def transformStats(stats: List[Tree])(using Context): List[Tree] =
+    val statsList = stats.toIndexedSeq
+    // Pre-scan: for each @newtype TypeDef, find a ModuleDef anywhere later in the same
+    // statement list whose term-name matches. Macro paradise on Scala 2 finds companions via the
+    // typer's symbol lookup, which works regardless of intervening `type`/`val` decls. We need to
+    // emulate that here — using only the immediately-next stat is too narrow for codebases that
+    // place companion objects after `type` aliases (a common idiom inside `package object`s).
+    val consumedCompanion = scala.collection.mutable.Set.empty[Int]
+    val companionForNewtype = scala.collection.mutable.Map.empty[Int, Int]
+    for i <- statsList.indices do
+      statsList(i) match
+        case td: TypeDef if td.rhs.isInstanceOf[Template] && findNewTypeAnnotation(td).isDefined =>
+          val target = td.name.toTermName
+          var j = i + 1
+          var found = -1
+          while j < statsList.length && found < 0 do
+            statsList(j) match
+              case md: ModuleDef if md.name == target && !consumedCompanion(j) =>
+                found = j
+              case _ =>
+            j += 1
+          if found >= 0 then
+            companionForNewtype(i) = found
+            consumedCompanion += found
+        case _ =>
+
     val result = ListBuffer.empty[Tree]
     var i = 0
-    val statsList = stats.toIndexedSeq
     while i < statsList.length do
-      val stat = statsList(i)
-      stat match
-        case td: TypeDef if td.rhs.isInstanceOf[Template] =>
-          findNewTypeAnnotation(td) match
-            case Some((annotation, isSubtype)) =>
-              val params = AnnotationParams.extract(annotation, isSubtype)
-              // Look ahead for companion object
-              val companionOpt = if i + 1 < statsList.length then
-                statsList(i + 1) match
-                  case md: ModuleDef if md.name.toTermName == td.name.toTermName => Some(md)
-                  case _ => None
-              else None
-
-              val expanded = expandNewType(td, companionOpt, params)
-              result ++= expanded
-
-              if companionOpt.isDefined then i += 1 // skip companion, we merged it
-            case None =>
-              result += transform(stat)
-        case _ =>
-          result += transform(stat)
-      i += 1
+      if consumedCompanion(i) then
+        i += 1
+      else
+        statsList(i) match
+          case td: TypeDef if td.rhs.isInstanceOf[Template] =>
+            findNewTypeAnnotation(td) match
+              case Some((annotation, isSubtype)) =>
+                val params = AnnotationParams.extract(annotation, isSubtype)
+                val companionOpt = companionForNewtype.get(i)
+                  .map(j => statsList(j).asInstanceOf[ModuleDef])
+                val expanded = expandNewType(td, companionOpt, params)
+                result ++= expanded
+              case None =>
+                result += transform(statsList(i))
+          case _ =>
+            result += transform(statsList(i))
+        i += 1
     result.toList
 
   /** Find @newtype or @newsubtype annotation on a TypeDef. */
@@ -138,11 +157,6 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
          |  def derivingK[TC[_[_]]](implicit ev: TC[Repr]): TC[Type] = ev.asInstanceOf[TC[Type]]""".stripMargin
     else ""
 
-    // Merge with existing companion body
-    val existingCompanionCode = companionOpt.map { md =>
-      md.impl.body.map(plain(_)).mkString("\n  ", "\n  ", "")
-    }.getOrElse("")
-
     // Coercible implicits: for parameterized types, use def with type params
     val C = "_root_.io.estatico.newtype.Coercible"
     val coercibleImplicits = if tparams.isEmpty then
@@ -182,15 +196,35 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
       |$opsCode
       |$derivingCode
       |$derivingKCode
-      |$existingCompanionCode
       |}""".stripMargin
 
     if params.debug then
       println(s"[newtype-compat] Generated source for @${if params.isSubtype then "newsubtype" else "newtype"} $nameStr:")
       source.linesIterator.foreach(line => println(s"[newtype-compat]   $line"))
 
-    // Parse the generated source code into untyped trees
-    parseStats(source)
+    // Parse the generated source code into untyped trees, then splice the companion's body
+    // structurally (rather than via tree.show round-trip — which emits the `module` soft keyword
+    // for nested objects and produces source that won't reparse).
+    val stats = parseStats(source)
+    companionOpt match
+      case None => stats
+      case Some(companion) =>
+        val companionTermName = name.toTermName
+        stats.map {
+          case md: ModuleDef if md.name == companionTermName =>
+            // Splice the companion's full Template into the synthesized one. We need to carry
+            // over `parents` (e.g. `extends WithGenericSalesforceId[...]`), `derived` (any
+            // `derives` clauses), and `self` from the original — the synthesized object only
+            // provides default-empty values for those. Body members from both are concatenated.
+            val mergedImpl = cpy.Template(md.impl)(
+              parents = if companion.impl.parents.nonEmpty then companion.impl.parents else md.impl.parents,
+              derived = if companion.impl.derived.nonEmpty then companion.impl.derived else md.impl.derived,
+              self    = if companion.impl.self != md.impl.self then companion.impl.self else md.impl.self,
+              body    = md.impl.body ++ companion.impl.body
+            )
+            untpd.ModuleDef(md.name, mergedImpl).withMods(md.mods).withSpan(md.span)
+          case other => other
+        }
 
   private def buildOpsCodeFromMethods(
     nameStr: String, reprNameStr: String, reprTypeStr: String,
@@ -285,6 +319,9 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
         self = transformSub(md.impl.self),
         body = transformStats(md.impl.body)
       )
-      untpd.ModuleDef(md.name, newImpl).withSpan(md.span)
+      // Preserve the original modifiers (incl. the package-object marker) — without `withMods`,
+      // a `package object` would be reconstructed as a regular `object`, breaking sub-packages
+      // and parent-package-object scope inheritance.
+      untpd.ModuleDef(md.name, newImpl).withMods(md.mods).withSpan(md.span)
     case _ =>
       super.transform(tree)
