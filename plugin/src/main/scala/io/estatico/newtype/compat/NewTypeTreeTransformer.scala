@@ -264,7 +264,16 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
 
   override def transform(tree: Tree)(using Context): Tree = tree match
     case PackageDef(pid, stats) =>
-      cpy.PackageDef(tree)(transform(pid).asInstanceOf[RefTree], transformStats(stats))
+      val transformedPid = transform(pid).asInstanceOf[RefTree]
+      stats.partition { case md: ModuleDef => md.mods.is(Package); case _ => false } match
+        case (pkgObj :: Nil, otherStats) =>
+          val md = pkgObj.asInstanceOf[ModuleDef]
+          val innerBody = transformStats(md.impl.body)
+          val allInnerStats = otherStats.map(transform) ++ innerBody
+          val newPid = Select(transformedPid, md.name)
+          untpd.PackageDef(newPid, allInnerStats)
+        case _ =>
+          cpy.PackageDef(tree)(transformedPid, transformStats(stats))
     case Block(stats, expr) =>
       cpy.Block(tree)(transformStats(stats), transform(expr))
     case td @ TypeDef(name, rhs: Template) if !findNewTypeAnnotation(td).isDefined =>
