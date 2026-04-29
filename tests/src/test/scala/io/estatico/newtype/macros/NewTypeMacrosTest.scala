@@ -28,6 +28,11 @@ class NewTypeMacrosTest extends AnyFlatSpec with Matchers {
     x.coerce[List[Int]] shouldBe List(1, 2, 3)
   }
 
+  it should "provide field accessor for parameterized newtype" in {
+    val x = Baz(List("a", "b"))
+    x.xs shouldBe List("a", "b")
+  }
+
   it should "support deriving" in {
     implicit val showInt: Show[Int] = (a: Int) => a.toString
     val showFoo: Show[Foo] = Foo.deriving[Show]
@@ -37,6 +42,12 @@ class NewTypeMacrosTest extends AnyFlatSpec with Matchers {
   it should "support instance methods" in {
     val x = HasMethods(10)
     x.plus(5) shouldBe HasMethods(15)
+  }
+
+  it should "support instance methods with chaining" in {
+    val c = HasMethods(0)
+    c.increment shouldBe HasMethods(1)
+    c.increment.increment shouldBe HasMethods(2)
   }
 
   it should "support unapply when enabled" in {
@@ -65,6 +76,8 @@ class NewTypeMacrosTest extends AnyFlatSpec with Matchers {
     x.coerce[Int] shouldBe 7
   }
 
+  behavior of "Coercible"
+
   it should "support Coercible wrapping/unwrapping" in {
     val w = implicitly[Coercible[Int, Foo]]
     val u = implicitly[Coercible[Foo, Int]]
@@ -77,6 +90,19 @@ class NewTypeMacrosTest extends AnyFlatSpec with Matchers {
     val foo = 42.coerce[Foo]
     val int = foo.coerce[Int]
     int shouldBe 42
+  }
+
+  it should "provide implicit wrapM and unwrapM" in {
+    val wm = implicitly[Coercible[List[Int], List[Foo]]]
+    val um = implicitly[Coercible[List[Foo], List[Int]]]
+    val foos = wm(List(1, 2))
+    um(foos) shouldBe List(1, 2)
+  }
+
+  it should "coerce nested type constructors via Coercible.unsafeWrapMM" in {
+    val nested: Option[List[Int]] = Some(List(1, 2, 3))
+    val coerced = implicitly[Coercible[Option[List[Int]], Option[List[Foo]]]].apply(nested)
+    coerced shouldBe Some(List(1, 2, 3))
   }
 }
 
@@ -93,6 +119,7 @@ object NewTypeMacrosTest {
 
   @newtype case class HasMethods(value: Int) {
     def plus(other: Int): HasMethods = HasMethods(value + other)
+    def increment: HasMethods = HasMethods(value + 1)
   }
 
   @newtype(unapply = true) case class WithUnapply(x: Int)
