@@ -252,9 +252,15 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
         s"    def ${vd.name}$retType = $body"
     }
 
+    // Always include the constructor-param accessor (`def value: Repr`, etc.) alongside any
+    // user-declared instance methods. Without this, code like `email.value` from outside the
+    // newtype's body fails to resolve whenever the body declares any method.
+    val accessor = s"    def $reprNameStr: $reprTypeStr = $$this$$.asInstanceOf[$reprTypeStr]"
+    val members = (accessor :: methodStrs).mkString("\n")
+
     s"""
        |  implicit class Ops$$$$newtype$tparamsDecl(val $$this$$: Type$tparamsRef) {
-       |${methodStrs.mkString("\n")}
+       |$members
        |  }""".stripMargin
 
   /** Rewrite method body string: replace references to constructor param with $this$.asInstanceOf[ReprType] */
