@@ -263,14 +263,19 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
        |$members
        |  }""".stripMargin
 
-  /** Rewrite method body string: replace references to constructor param with $this$.asInstanceOf[ReprType] */
+  /** Rewrite method body: replace bare references to the constructor param with
+   *  `$this$.asInstanceOf[ReprType]`. Done at the tree level — only `Ident(reprName)`
+   *  is replaced. Member selections like `Select(_, reprName)` (e.g. `Refined.value`
+   *  when the param is also named `value`) are intentionally left alone. */
   private def rewriteBodyStr(body: Tree, reprNameStr: String, reprTypeStr: String)(using Context): String =
-    // Show the body as a string, then textually replace the param reference
-    // This is a simple approach; for complex cases we'd need proper tree rewriting
-    val bodyStr = plain(body)
-    // Replace standalone references to the repr param with the cast expression
-    // Use word boundary matching to avoid replacing partial matches
-    bodyStr.replaceAll(s"\\b${java.util.regex.Pattern.quote(reprNameStr)}\\b", s"\\$$this\\$$.asInstanceOf[$reprTypeStr]")
+    val sentinel = "__newtype_repr_reference_sentinel__"
+    val rewriter = new UntypedTreeMap:
+      override def transform(tree: Tree)(using Context): Tree = tree match
+        case Ident(name) if name.toString == reprNameStr =>
+          Ident(termName(sentinel))
+        case _ => super.transform(tree)
+    val rewritten = rewriter.transform(body)
+    plain(rewritten).replace(sentinel, s"$$this$$.asInstanceOf[$reprTypeStr]")
 
   /** Strip ANSI color codes from .show output */
   private def plain(tree: Tree)(using Context): String =
