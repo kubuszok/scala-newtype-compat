@@ -39,6 +39,20 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
                 found = j
               case _ =>
             j += 1
+          // Fallback: search backward. Scala 2's macro paradise resolves companions via symbol
+          // lookup, which is order-independent — so a companion declared *before* the @newtype
+          // class (a common idiom when the companion holds the type alias used by the param,
+          // e.g. `object Page { type PageType = Long }; @newtype case class Page(value: Page.PageType)`)
+          // must be merged too. Without this, the original companion is left in place AND the
+          // plugin synthesizes a second one with the same name, causing a duplicate-definition error.
+          if found < 0 then
+            var k = i - 1
+            while k >= 0 && found < 0 do
+              statsList(k) match
+                case md: ModuleDef if md.name == target && !consumedCompanion(k) =>
+                  found = k
+                case _ =>
+              k -= 1
           if found >= 0 then
             companionForNewtype(i) = found
             consumedCompanion += found
