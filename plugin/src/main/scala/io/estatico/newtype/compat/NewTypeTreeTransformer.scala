@@ -39,6 +39,20 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
                 found = j
               case _ =>
             j += 1
+          // Fallback: search backward. Scala 2's macro paradise resolves companions via symbol
+          // lookup, which is order-independent — so a companion declared *before* the @newtype
+          // class (a common idiom when the companion holds the type alias used by the param,
+          // e.g. `object Page { type PageType = Long }; @newtype case class Page(value: Page.PageType)`)
+          // must be merged too. Without this, the original companion is left in place AND the
+          // plugin synthesizes a second one with the same name, causing a duplicate-definition error.
+          if found < 0 then
+            var k = i - 1
+            while k >= 0 && found < 0 do
+              statsList(k) match
+                case md: ModuleDef if md.name == target && !consumedCompanion(k) =>
+                  found = k
+                case _ =>
+              k -= 1
           if found >= 0 then
             companionForNewtype(i) = found
             consumedCompanion += found
@@ -252,19 +266,30 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
         s"    def ${vd.name}$retType = $body"
     }
 
+    // Always include the constructor-param accessor (`def value: Repr`, etc.) alongside any
+    // user-declared instance methods. Without this, code like `email.value` from outside the
+    // newtype's body fails to resolve whenever the body declares any method.
+    val accessor = s"    def $reprNameStr: $reprTypeStr = $$this$$.asInstanceOf[$reprTypeStr]"
+    val members = (accessor :: methodStrs).mkString("\n")
+
     s"""
        |  implicit class Ops$$$$newtype$tparamsDecl(val $$this$$: Type$tparamsRef) {
-       |${methodStrs.mkString("\n")}
+       |$members
        |  }""".stripMargin
 
-  /** Rewrite method body string: replace references to constructor param with $this$.asInstanceOf[ReprType] */
+  /** Rewrite method body: replace bare references to the constructor param with
+   *  `$this$.asInstanceOf[ReprType]`. Done at the tree level — only `Ident(reprName)`
+   *  is replaced. Member selections like `Select(_, reprName)` (e.g. `Refined.value`
+   *  when the param is also named `value`) are intentionally left alone. */
   private def rewriteBodyStr(body: Tree, reprNameStr: String, reprTypeStr: String)(using Context): String =
-    // Show the body as a string, then textually replace the param reference
-    // This is a simple approach; for complex cases we'd need proper tree rewriting
-    val bodyStr = plain(body)
-    // Replace standalone references to the repr param with the cast expression
-    // Use word boundary matching to avoid replacing partial matches
-    bodyStr.replaceAll(s"\\b${java.util.regex.Pattern.quote(reprNameStr)}\\b", s"\\$$this\\$$.asInstanceOf[$reprTypeStr]")
+    val sentinel = "__newtype_repr_reference_sentinel__"
+    val rewriter = new UntypedTreeMap:
+      override def transform(tree: Tree)(using Context): Tree = tree match
+        case Ident(name) if name.toString == reprNameStr =>
+          Ident(termName(sentinel))
+        case _ => super.transform(tree)
+    val rewritten = rewriter.transform(body)
+    plain(rewritten).replace(sentinel, s"$$this$$.asInstanceOf[$reprTypeStr]")
 
   /** Strip ANSI color codes from .show output */
   private def plain(tree: Tree)(using Context): String =
