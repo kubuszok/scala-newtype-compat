@@ -1,4 +1,5 @@
 import kubuszok.sbt._
+import sbtwelcome.UsefulTask
 import kubuszok.sbt.KubuszokPlugin.autoImport._
 
 // Versions:
@@ -51,15 +52,24 @@ val noPublishSettings =
 
 lazy val root = project
   .in(file("."))
+  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(noPublishSettings)
   .settings(
     name := "scala-newtype-compat-root",
-    crossScalaVersions := Nil
+    crossScalaVersions := Nil,
+    logo := s"scala-newtype-compat ${version.value}",
+    usefulTasks := Seq(
+      UsefulTask("+compile", "Compile all Scala versions").noAlias,
+      UsefulTask("+test", "Test all Scala versions").noAlias,
+      UsefulTask("+publishLocal", "Publish locally for all versions").noAlias,
+      UsefulTask("ci-release", "Publish snapshot or release (based on git tags)").noAlias
+    )
   )
   .aggregate(compat, plugin, tests)
 
 lazy val compat = project
+  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(
     name := "newtype-compat",
@@ -70,6 +80,7 @@ lazy val compat = project
   )
 
 lazy val plugin = project
+  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(
     name := "newtype-plugin",
@@ -81,6 +92,7 @@ lazy val plugin = project
 
 lazy val tests = project
   .dependsOn(compat)
+  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(noPublishSettings)
   .settings(
