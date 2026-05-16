@@ -1,7 +1,5 @@
-import com.jsuereth.sbtpgp.PgpKeys.publishSigned
-
-// Used to publish snapshots to Maven Central.
-val mavenCentralSnapshots = "Maven Central Snapshots" at "https://central.sonatype.com/repository/maven-snapshots"
+import kubuszok.sbt._
+import kubuszok.sbt.KubuszokPlugin.autoImport._
 
 // Versions:
 
@@ -43,64 +41,35 @@ val publishSettings = Seq(
       <url>https://github.com/MateuszKubuszok/scala-newtype-compat/issues</url>
     </issueManagement>
   ),
-  publishTo := {
-    if (isSnapshot.value) Some(mavenCentralSnapshots)
-    else localStaging.value
-  },
-  publishMavenStyle := true,
-  Test / publishArtifact := false,
-  pomIncludeRepository := {
-    _ => false
-  },
-  versionScheme := Some("early-semver"),
-  git.useGitDescribe := true,
-  git.uncommittedSignifier := None,
-  // Sonatype ignores isSnapshot setting and only looks at -SNAPSHOT suffix in version:
-  //   https://central.sonatype.org/publish/publish-maven/#performing-a-snapshot-deployment
-  // meanwhile sbt-git used to set up SNAPSHOT if there were uncommitted changes:
-  //   https://github.com/sbt/sbt-git/issues/164
-  // (now this suffix is empty by default) so we need to fix it manually.
-  git.gitUncommittedChanges := git.gitCurrentTags.value.isEmpty,
-  git.uncommittedSignifier := Some("SNAPSHOT")
+  projectType := ProjectType.ScalaLibrary
 )
 
 val noPublishSettings =
-  Seq(publish / skip := true, publishArtifact := false)
+  Seq(projectType := ProjectType.NonPublished)
 
 // Modules:
 
 lazy val root = project
   .in(file("."))
-  .enablePlugins(GitVersioning, GitBranchPrompt)
   .settings(publishSettings)
   .settings(noPublishSettings)
   .settings(
     name := "scala-newtype-compat-root",
-    crossScalaVersions := Nil,
-    commands += Command.command("ci-release") { state =>
-      val extracted = Project.extract(state)
-      val tags = extracted.get(git.gitCurrentTags)
-      val cmd = if (tags.nonEmpty) "+publishSigned ; sonaRelease" else "+publishSigned"
-      cmd :: state
-    }
+    crossScalaVersions := Nil
   )
   .aggregate(compat, plugin, tests)
 
 lazy val compat = project
-  .enablePlugins(GitVersioning, GitBranchPrompt)
   .settings(publishSettings)
   .settings(
     name := "newtype-compat",
     crossScalaVersions := Seq(scala2_13, scala3Versions.head),
     scalaVersion := scala3Versions.head,
-    // Empty artifact — no source files, just brings in the dependency
     Compile / sources := Seq.empty,
-    // Always depend on the 2.13 artifact (Scala 3 can consume 2.13 jars)
     libraryDependencies += "io.estatico" % "newtype_2.13" % newtypeVersion
   )
 
 lazy val plugin = project
-  .enablePlugins(GitVersioning, GitBranchPrompt)
   .settings(publishSettings)
   .settings(
     name := "newtype-plugin",
@@ -112,7 +81,6 @@ lazy val plugin = project
 
 lazy val tests = project
   .dependsOn(compat)
-  .enablePlugins(GitVersioning, GitBranchPrompt)
   .settings(publishSettings)
   .settings(noPublishSettings)
   .settings(
@@ -125,7 +93,6 @@ lazy val tests = project
       else
         Seq(s"-Xplugin:${(plugin / Compile / packageBin).value.getAbsolutePath}")
     },
-    // Force plugin to compile first when testing on Scala 3
     (Test / compile) := {
       if (scalaVersion.value.startsWith("3."))
         (plugin / Compile / packageBin).value

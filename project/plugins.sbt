@@ -1,4 +1,2 @@
-// git
-addSbtPlugin("com.github.sbt" % "sbt-git" % "2.1.0")
-// publishing
-addSbtPlugin("com.github.sbt" % "sbt-pgp" % "2.3.1")
+// kubuszok plugin (bundles: sbt-git, sbt-pgp, and more)
+addSbtPlugin("com.kubuszok" % "sbt-kubuszok" % "0.1.0")
