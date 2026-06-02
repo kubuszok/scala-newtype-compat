@@ -4,7 +4,7 @@ import kubuszok.sbt.KubuszokPlugin.autoImport._
 
 // Versions:
 
-val scala2_13 = "2.13.16"
+val scala2_13 = "2.13.18"
 
 val scala3Versions = Seq(
   // 3.3.0 omitted: its bytecode reader fails on JDK 25's `ElementType`/`AccessFlag` class files
