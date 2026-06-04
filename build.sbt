@@ -113,7 +113,7 @@ lazy val tests = project
       (Test / compile).value
     },
     libraryDependencies ++= Seq(
-      "org.scalatest"  %% "scalatest"  % "3.2.19" % Test,
+      "org.scalatest"  %% "scalatest"  % "3.2.20" % Test,
       "org.scalacheck" %% "scalacheck" % "1.19.0" % Test,
       "org.typelevel"  %% "cats-core"  % "2.12.0" % Test,
       "eu.timepit"     %% "refined"    % "0.11.3" % Test
