@@ -26,7 +26,11 @@ jobs:
           jvm: "temurin:1.17.0.15"
           apps: sbt
       - name: Publish all projects
-        run: sbt ci-release
+        # `+publishSigned` cross-publishes every version in crossScalaVersions (all Scala 3
+        # versions for the plugin, 2.13 + 3 for compat). The plugin's `ci-release` command runs
+        # a bare `publishSigned`, which only publishes each module's default scalaVersion.
+        # On a tag, also release the staged Sonatype bundle.
+        run: sbt "+publishSigned" ${{ startsWith(github.ref, 'refs/tags/') && 'sonaRelease' || '' }}
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
