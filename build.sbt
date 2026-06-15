@@ -3,20 +3,15 @@ import sbtwelcome.UsefulTask
 import kubuszok.sbt.KubuszokPlugin.autoImport._
 
 // Versions:
+// Single source of truth shared with .github/workflows/ci.yml — see project/scala*-versions.txt.
 
-val scala2_13 = "2.13.18"
+def readVersions(path: String): Seq[String] =
+  IO.readLines(file(path)).map(_.trim).filterNot(line => line.isEmpty || line.startsWith("#"))
 
-val scala3Versions = Seq(
-  // 3.3.0 omitted: its bytecode reader fails on JDK 25's `ElementType`/`AccessFlag` class files
-  // ("bad constant pool index: 0"). Fixed in 3.3.1.
-  "3.3.1", "3.3.3", "3.3.4", "3.3.5", "3.3.6", "3.3.7", "3.3.8",
-  "3.4.0", "3.4.1", "3.4.2", "3.4.3",
-  "3.5.0", "3.5.1", "3.5.2",
-  "3.6.2", "3.6.3", "3.6.4",
-  "3.7.0", "3.7.1", "3.7.2", "3.7.3", "3.7.4",
-  "3.8.0", "3.8.1", "3.8.2", "3.8.3", "3.8.4"
-)
+val scala2Versions = readVersions("project/scala2-versions.txt")
+val scala3Versions = readVersions("project/scala3-versions.txt")
 
+val scala2_13 = scala2Versions.head
 val scala3Latest = scala3Versions.last
 
 val newtypeVersion = "0.4.4"
