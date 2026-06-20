@@ -1,5 +1,4 @@
 import kubuszok.sbt._
-import sbtwelcome.UsefulTask
 import kubuszok.sbt.KubuszokPlugin.autoImport._
 
 // Versions:
@@ -65,16 +64,16 @@ lazy val root = project
   .settings(noPublishSettings)
   .settings(
     name := "scala-newtype-compat-root",
-    crossScalaVersions := Nil,
-    logo := s"scala-newtype-compat ${version.value}",
-    usefulTasks := Seq(
-      UsefulTask("+compile", "Compile all Scala versions").noAlias,
-      UsefulTask("+test", "Test all Scala versions").noAlias,
-      UsefulTask("+publishLocal", "Publish locally for all versions").noAlias,
-      UsefulTask("ci-release", "Publish snapshot or release (based on git tags)").noAlias
-    )
+    crossScalaVersions := Nil
   )
   .aggregate(compat, plugin, tests)
+
+// Convenience aliases. sbt-welcome (which previously exposed `logo`/`usefulTasks`) has no sbt 2.0
+// build and is no longer bundled by sbt-kubuszok, so the help-menu tasks are registered as aliases
+// instead. Note: in sbt 2.0 the bare `test` task is incremental/cached; `testFull` forces a real run.
+addCommandAlias("compileAll", "+compile")
+addCommandAlias("testAll", "+testFull")
+addCommandAlias("publishLocalAll", "+publishLocal")
 
 lazy val compat = project
   .enablePlugins(KubuszokRootPlugin)
@@ -112,10 +111,17 @@ lazy val tests = project
     scalacOptions ++= {
       if (scalaVersion.value.startsWith("2."))
         Seq("-Ymacro-annotations")
-      else
-        Seq(s"-Xplugin:${(plugin / Compile / packageBin).value.getAbsolutePath}")
+      else {
+        // sbt 2.0: packageBin yields an xsbti.HashedVirtualFileRef (no getAbsolutePath); convert
+        // to a real path via the build's fileConverter.
+        val pluginJar = fileConverter.value.toPath((plugin / Compile / packageBin).value).toAbsolutePath
+        Seq(s"-Xplugin:$pluginJar")
+      }
     },
-    (Test / compile) := {
+    // sbt 2.0 caches task results and has no sjsonnew JsonFormat for CompileAnalysis; this override
+    // only exists to force the compiler plugin to be packaged before the Scala 3 tests compile, so
+    // opt out of caching with Def.uncached.
+    (Test / compile) := Def.uncached {
       if (scalaVersion.value.startsWith("3."))
         (plugin / Compile / packageBin).value
       (Test / compile).value
