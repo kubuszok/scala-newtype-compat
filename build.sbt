@@ -45,6 +45,17 @@ val publishSettings = Seq(
 val noPublishSettings =
   Seq(projectType := ProjectType.NonPublished)
 
+// JDK 26+ future-proofing: on the 3.3 LTS line, lazy vals use the legacy bitmap encoding that
+// breaks under newer JDKs. `-Yfuture-lazy-vals` opts into the new encoding (built-in on 3.4+),
+// but it requires `-java-output-version >= 9`. Apply ONLY on 3.3.8 (JVM-only project); never on
+// 2.13 and never on 3.4+/3.8 (which already have the new encoding by default).
+val jdkFutureProofSettings = Seq(
+  scalacOptions ++= {
+    if (scalaVersion.value == "3.3.8") Seq("-Yfuture-lazy-vals", "-java-output-version", "17")
+    else Seq.empty
+  }
+)
+
 // Modules:
 
 lazy val root = project
@@ -79,6 +90,7 @@ lazy val compat = project
 lazy val plugin = project
   .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
+  .settings(jdkFutureProofSettings)
   .settings(
     name := "newtype-plugin",
     crossVersion := CrossVersion.full,
@@ -92,6 +104,7 @@ lazy val tests = project
   .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(noPublishSettings)
+  .settings(jdkFutureProofSettings)
   .settings(
     name := "newtype-compat-tests",
     crossScalaVersions := scala2_13 +: scala3Versions,
