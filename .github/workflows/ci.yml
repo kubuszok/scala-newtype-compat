@@ -38,4 +38,5 @@ jobs:
           jvm: "temurin:1.17.0.15"
           apps: sbt
       - name: Run tests
-        run: sbt "++${{ matrix.scala }}; tests/test"
+        # sbt 2.0 makes the bare `test` task incremental/cached; `testFull` forces a real run.
+        run: sbt "++${{ matrix.scala }}; tests/testFull"
