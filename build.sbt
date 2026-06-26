@@ -19,13 +19,13 @@ val newtypeVersion = "0.4.4"
 
 val publishSettings = Seq(
   organization := "com.kubuszok",
-  homepage := Some(url("https://github.com/MateuszKubuszok/scala-newtype-compat")),
+  homepage := Some(url("https://github.com/kubuszok/scala-newtype-compat")),
   organizationHomepage := Some(url("https://kubuszok.com")),
   licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
   scmInfo := Some(
     ScmInfo(
-      url("https://github.com/MateuszKubuszok/scala-newtype-compat/"),
-      "scm:git:git@github.com:MateuszKubuszok/scala-newtype-compat.git"
+      url("https://github.com/kubuszok/scala-newtype-compat/"),
+      "scm:git:git@github.com:kubuszok/scala-newtype-compat.git"
     )
   ),
   startYear := Some(2026),
@@ -35,7 +35,7 @@ val publishSettings = Seq(
   pomExtra := (
     <issueManagement>
       <system>GitHub issues</system>
-      <url>https://github.com/MateuszKubuszok/scala-newtype-compat/issues</url>
+      <url>https://github.com/kubuszok/scala-newtype-compat/issues</url>
     </issueManagement>
   ),
   projectType := ProjectType.ScalaLibrary
