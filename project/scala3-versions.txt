@@ -1,6 +1,14 @@
 # Scala 3 versions to cross-build/test/publish (one per line, '#' for comments).
-# 3.3 LTS line: use 3.3.8 (latest LTS patch). Earlier 3.3.x patches collapsed here.
-# (3.3.0 had a JDK 25 bytecode-reader bug fixed in 3.3.1; moot now that we pin 3.3.8.)
+# Publish for ALL stable Scala 3 releases from 3.3.0 onward so every 3.3+ user can depend on the
+# plugin. Keep in sync with stable releases of org.scala-lang:scala3-compiler_3 on Maven Central.
+3.3.0
+3.3.1
+3.3.2
+3.3.3
+3.3.4
+3.3.5
+3.3.6
+3.3.7
 3.3.8
 3.4.0
 3.4.1
@@ -9,6 +17,8 @@
 3.5.0
 3.5.1
 3.5.2
+3.6.0
+3.6.1
 3.6.2
 3.6.3
 3.6.4

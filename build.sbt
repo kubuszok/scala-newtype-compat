@@ -44,23 +44,30 @@ val publishSettings = Seq(
 val noPublishSettings =
   Seq(projectType := ProjectType.NonPublished)
 
-// Explicit JDK target per Scala version — don't rely on the compiler's implicit bytecode-version
-// inference. The build host is JDK 17 (sbt 2.0 requires it), so `-release` is what actually pins
-// each artifact's JDK floor:
-//   - 3.3 LTS through 3.7 -> JDK 11. These compilers support JDK 8+, so a JDK 11 floor is valid
-//     (we deliberately avoid JDK 8). The 3.3 line additionally needs `-Yfuture-lazy-vals` (legacy
-//     lazy-val bitmap encoding breaks under newer JDKs; built-in on 3.4+), which needs output >= 9.
-//   - 3.8+ (incl. the future 3.9 LTS) -> JDK 17: Scala 3.8 raised the minimum JDK to 17.
-//   - 2.13 -> untouched: the published `compat` shim has empty sources and the plugin is Scala-3
-//     only, so 2.13 appears only in the non-published `tests` module.
+// Explicit JDK bytecode target per Scala version — never rely on implicit inference, which would
+// follow the build host's JDK (17, since sbt 2.0 requires it). Scala 2.13 uses `-release`; Scala 3
+// uses `-java-output-version`:
+//   - 2.13                 -> Java 8  (without this it infers the host JDK 17)
+//   - 3.3.0 - 3.3.7        -> Java 8
+//   - 3.3.8+ (3.3 LTS)     -> Java 11, plus `-Yfuture-lazy-vals` (new lazy-val encoding, needed for
+//                             JDK 26+; built-in on 3.4+, opt-in on 3.3, and it requires output >= 9)
+//   - 3.4, 3.5, 3.6, 3.7   -> Java 8
+//   - 3.8+ (incl. 3.9 LTS) -> Java 17 (Scala 3.8 raised the minimum JDK to 17)
 val jdkFutureProofSettings = Seq(
   scalacOptions ++= {
     val sv = scalaVersion.value
-    if (sv.startsWith("3.")) {
-      val minor = sv.split('.')(1).toInt
-      val release = Seq("-release", if (minor >= 8) "17" else "11")
-      if (minor == 3) "-Yfuture-lazy-vals" +: release else release
-    } else Seq.empty
+    if (sv.startsWith("2.")) Seq("-release:8")
+    else {
+      val parts = sv.split('.')
+      val minor = parts(1).toInt
+      val patch = parts(2).takeWhile(_.isDigit).toInt
+      val out =
+        if (minor >= 8) "17"                    // 3.8+ require JDK 17
+        else if (minor == 3 && patch >= 8) "11" // 3.3.8+: -Yfuture-lazy-vals needs output >= 9
+        else "8"                                // 3.3.0-3.3.7 and 3.4-3.7: widest floor
+      val base = Seq("-java-output-version", out)
+      if (minor == 3 && patch >= 8) "-Yfuture-lazy-vals" +: base else base
+    }
   }
 )
 
