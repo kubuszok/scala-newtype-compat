@@ -47,18 +47,20 @@ val noPublishSettings =
 // Explicit JDK target per Scala version — don't rely on the compiler's implicit bytecode-version
 // inference. The build host is JDK 17 (sbt 2.0 requires it), so `-release` is what actually pins
 // each artifact's JDK floor:
-//   - 3.3 LTS line -> JDK 11. This is the supported floor; we deliberately avoid JDK 8. The 3.3
-//     line also needs `-Yfuture-lazy-vals` (legacy lazy-val bitmap encoding breaks under newer
-//     JDKs; built-in on 3.4+), which requires output >= 9 — JDK 11 satisfies that.
-//   - 3.4+ / Next line (3.8, future 3.9+) -> JDK 17, matching what those compilers require.
+//   - 3.3 LTS through 3.7 -> JDK 11. These compilers support JDK 8+, so a JDK 11 floor is valid
+//     (we deliberately avoid JDK 8). The 3.3 line additionally needs `-Yfuture-lazy-vals` (legacy
+//     lazy-val bitmap encoding breaks under newer JDKs; built-in on 3.4+), which needs output >= 9.
+//   - 3.8+ (incl. the future 3.9 LTS) -> JDK 17: Scala 3.8 raised the minimum JDK to 17.
 //   - 2.13 -> untouched: the published `compat` shim has empty sources and the plugin is Scala-3
 //     only, so 2.13 appears only in the non-published `tests` module.
 val jdkFutureProofSettings = Seq(
   scalacOptions ++= {
     val sv = scalaVersion.value
-    if (sv.startsWith("3.3")) Seq("-Yfuture-lazy-vals", "-release", "11")
-    else if (sv.startsWith("3.")) Seq("-release", "17")
-    else Seq.empty
+    if (sv.startsWith("3.")) {
+      val minor = sv.split('.')(1).toInt
+      val release = Seq("-release", if (minor >= 8) "17" else "11")
+      if (minor == 3) "-Yfuture-lazy-vals" +: release else release
+    } else Seq.empty
   }
 )
 
