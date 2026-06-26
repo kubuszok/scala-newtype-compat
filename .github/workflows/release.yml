@@ -30,7 +30,10 @@ jobs:
         # versions for the plugin, 2.13 + 3 for compat). The plugin's `ci-release` command runs
         # a bare `publishSigned`, which only publishes each module's default scalaVersion.
         # On a tag, also release the staged Sonatype bundle.
-        run: sbt "+publishSigned" ${{ startsWith(github.ref, 'refs/tags/') && 'sonaRelease' || '' }}
+        # NB: sbt 2.0 joins multiple program args into ONE command line, so `sbt "+publishSigned"
+        # sonaRelease` became the invalid `+publishSigned sonaRelease` ("Expected ';'"). Pass a
+        # single, `;`-separated command instead.
+        run: sbt "+publishSigned${{ startsWith(github.ref, 'refs/tags/') && '; sonaRelease' || '' }}"
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
