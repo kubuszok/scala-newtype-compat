@@ -146,6 +146,6 @@ lazy val tests = project
       "org.scalatest"  %% "scalatest"  % "3.2.20" % Test,
       "org.scalacheck" %% "scalacheck" % "1.19.0" % Test,
       "org.typelevel"  %% "cats-core"  % "2.13.0" % Test,
-      "eu.timepit"     %% "refined"    % "0.11.3" % Test
+      "eu.timepit"     %% "refined"    % "0.11.4" % Test
     )
   )
