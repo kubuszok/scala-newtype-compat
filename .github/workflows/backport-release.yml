@@ -55,8 +55,11 @@ jobs:
           jvm: "temurin:1.17.0.15"
           apps: sbt
       - name: Test and publish the plugin
-        # Fail fast if the git-derived version is not exactly the tag (e.g. a dirty tree would
-        # produce a -SNAPSHOT), then test on every requested version before publishing anything.
+        # Fail fast unless the checkout is clean and exactly at the tag: that is when the git-derived
+        # version equals the tag (otherwise it would be a -SNAPSHOT). Checked with git directly, as
+        # `sbt 'print plugin/version'` output is unreliable on sbt 2.0.0 (it races the server
+        # startup and sometimes prints nothing). Then test on every requested version before
+        # publishing anything.
         # NB: sbt 2.0 joins multiple program args into ONE command line, so pass a single
         # `;`-separated command.
         env:
@@ -65,6 +68,7 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         run: |
-          version=$(sbt -batch --no-colors 'print plugin/version' | grep -xE '[0-9]+\.[0-9]+\.[0-9]+[^[:space:]]*' | head -1)
-          [ "$version" = "$TAG" ] || { echo "Resolved version '$version' != tag '$TAG'"; exit 1; }
+          described=$(git describe --tags --exact-match HEAD)
+          [ "$described" = "$TAG" ] || { echo "HEAD is at '$described', not tag '$TAG'"; exit 1; }
+          [ -z "$(git status --porcelain)" ] || { git status --porcelain; echo "Working tree is dirty"; exit 1; }
           sbt "set plugin / crossScalaVersions := $SEQ; set tests / crossScalaVersions := $SEQ; +tests/testFull; +plugin/publishSigned; sonaRelease"
