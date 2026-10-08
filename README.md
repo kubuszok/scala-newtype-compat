@@ -6,7 +6,7 @@ scala-newtype provides `@newtype` and `@newsubtype` macro annotations for zero-c
 
 ## Status
 
-Work in progress. Tested on Scala 2.13.16 and all Scala 3 versions from 3.3.0 to 3.8.3.
+Work in progress. Tested on Scala 2.13.16 and all Scala 3 versions from 3.3.0 to 3.10.0.
 
 ## Setup
 
@@ -119,8 +119,8 @@ Both Scala 2.13 and 3 depend on the same `io.estatico:newtype_2.13` artifact for
 
 | Module | Description | Scala versions |
 |--------|-------------|----------------|
-| `newtype-compat` | Empty artifact that brings in `io.estatico:newtype_2.13:0.4.4` | 2.13, 3.3.x - 3.8.x |
-| `newtype-plugin` | Scala 3 compiler plugin | 3.3.x - 3.8.x |
+| `newtype-compat` | Empty artifact that brings in `io.estatico:newtype_2.13:0.4.4` | 2.13, 3.3.x - 3.10.x |
+| `newtype-plugin` | Scala 3 compiler plugin | 3.3.x - 3.10.x |
 
 ## Known limitations
 

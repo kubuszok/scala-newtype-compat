@@ -1,0 +1,70 @@
+name: Backport Release
+
+# Publishes newtype-plugin from an EXISTING tag for Scala versions released after that tag was cut
+# (e.g. tag 0.1.1 for Scala 3.9.0 and 3.10.0). Only the plugin is published, and only for the given
+# versions: every other artifact of that tag is already on Maven Central and re-uploading it would
+# make the Sonatype deployment fail.
+#
+# The tag is checked out as-is (the working tree stays clean, so the git-derived version is exactly
+# the tag) and the cross-build versions are overridden with `set` in the sbt session instead of
+# editing project/scala3-versions.txt.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to publish from, e.g. 0.1.1"
+        required: true
+      scala-versions:
+        description: "Space-separated Scala 3 versions to publish the plugin for, e.g. 3.9.0 3.10.0"
+        required: true
+
+jobs:
+  backport:
+    runs-on: ubuntu-latest
+
+    name: Publish newtype-plugin ${{ inputs.tag }} for Scala ${{ inputs.scala-versions }}
+
+    steps:
+      - name: Validate inputs
+        id: inputs
+        env:
+          TAG: ${{ inputs.tag }}
+          SCALA_VERSIONS: ${{ inputs.scala-versions }}
+        run: |
+          [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid tag: $TAG"; exit 1; }
+          versions=()
+          for v in $SCALA_VERSIONS; do
+            [[ "$v" =~ ^3\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid Scala 3 version: $v"; exit 1; }
+            versions+=("\"$v\"")
+          done
+          [ ${#versions[@]} -gt 0 ] || { echo "No Scala versions given"; exit 1; }
+          echo "seq=Seq($(IFS=,; echo "${versions[*]}"))" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: coursier/cache-action@v8
+      - name: Import GPG key for signing the release
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      - uses: coursier/setup-action@v3.0.3
+        with:
+          jvm: "temurin:1.17.0.15"
+          apps: sbt
+      - name: Test and publish the plugin
+        # Fail fast if the git-derived version is not exactly the tag (e.g. a dirty tree would
+        # produce a -SNAPSHOT), then test on every requested version before publishing anything.
+        # NB: sbt 2.0 joins multiple program args into ONE command line, so pass a single
+        # `;`-separated command.
+        env:
+          TAG: ${{ inputs.tag }}
+          SEQ: ${{ steps.inputs.outputs.seq }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        run: |
+          version=$(sbt -batch --no-colors 'print plugin/version' | grep -xE '[0-9]+\.[0-9]+\.[0-9]+[^[:space:]]*' | head -1)
+          [ "$version" = "$TAG" ] || { echo "Resolved version '$version' != tag '$TAG'"; exit 1; }
+          sbt "set plugin / crossScalaVersions := $SEQ; set tests / crossScalaVersions := $SEQ; +tests/testFull; +plugin/publishSigned; sonaRelease"
