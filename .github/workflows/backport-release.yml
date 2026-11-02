@@ -44,7 +44,7 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
-      - uses: coursier/cache-action@v8
+      - uses: coursier/cache-action@v9
       - name: Import GPG key for signing the release
         uses: crazy-max/ghaction-import-gpg@v7
         with:
