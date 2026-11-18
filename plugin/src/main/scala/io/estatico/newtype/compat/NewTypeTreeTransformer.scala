@@ -1,6 +1,6 @@
 package io.estatico.newtype.compat
 
-import dotty.tools.dotc.ast.{Trees, untpd}
+import dotty.tools.dotc.ast.{untpd, Trees}
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.core.Constants.Constant
@@ -61,15 +61,15 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
     val result = ListBuffer.empty[Tree]
     var i = 0
     while i < statsList.length do
-      if consumedCompanion(i) then
-        i += 1
+      if consumedCompanion(i) then i += 1
       else
         statsList(i) match
           case td: TypeDef if td.rhs.isInstanceOf[Template] =>
             findNewTypeAnnotation(td) match
               case Some((annotation, isSubtype)) =>
                 val params = AnnotationParams.extract(annotation, isSubtype)
-                val companionOpt = companionForNewtype.get(i)
+                val companionOpt = companionForNewtype
+                  .get(i)
                   .map(j => statsList(j).asInstanceOf[ModuleDef])
                 val expanded = expandNewType(td, companionOpt, params)
                 result ++= expanded
@@ -88,9 +88,9 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
 
   /** Expand a @newtype/@newsubtype class into a type alias + companion object. */
   private def expandNewType(
-    td: TypeDef,
-    companionOpt: Option[ModuleDef],
-    params: NewTypeParams
+      td: TypeDef,
+      companionOpt: Option[ModuleDef],
+      params: NewTypeParams
   )(using Context): List[Tree] =
     val name = td.name
     val nameStr = name.toString
@@ -117,11 +117,12 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
     // Extract instance methods from the class body (excluding constructor)
     val instanceMethods = tmpl.body.collect {
       case dd: DefDef if dd.name != nme.CONSTRUCTOR => dd
-      case vd: ValDef => vd
+      case vd: ValDef                               => vd
     }
 
     // Build type parameter strings
-    val tparamsDecl = if tparams.isEmpty then "" else {
+    val tparamsDecl = if tparams.isEmpty then ""
+    else {
       val ps = tparams.map { tp =>
         val variance = if tp.mods.is(Covariant) then "+" else if tp.mods.is(Contravariant) then "-" else ""
         val bounds = tp.rhs match
@@ -139,7 +140,7 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
 
     // Build the base type
     val baseType = if params.isSubtype then reprTypeRef
-    else s"Any { type ${nameStr}$$newtype }"
+    else s"Any { type $nameStr$$newtype }"
 
     // Build Ops class for accessor or instance methods
     val opsCode = if instanceMethods.nonEmpty && params.optimizeOps then
@@ -185,7 +186,7 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
     else
       // For parameterized newtypes, combine type params with M[_] in one bracket
       val tpNames = tparamNames.mkString(", ")
-      val tpMDecl = s"[${tpNames}, M[_]]" // e.g. [A, M[_]]
+      val tpMDecl = s"[$tpNames, M[_]]" // e.g. [A, M[_]]
       s"""  implicit def unsafeWrap$tparamsDecl: $C[Repr$tparamsRef, Type$tparamsRef] = $C.instance[Repr$tparamsRef, Type$tparamsRef]
          |  implicit def unsafeUnwrap$tparamsDecl: $C[Type$tparamsRef, Repr$tparamsRef] = $C.instance[Type$tparamsRef, Repr$tparamsRef]
          |  implicit def unsafeWrapM$tpMDecl: $C[M[Repr$tparamsRef], M[Type$tparamsRef]] = $C.instance[M[Repr$tparamsRef], M[Type$tparamsRef]]
@@ -196,24 +197,27 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
          |  implicit def cannotUnwrapArrayAmbiguous2$tparamsDecl: $C[Array[Type$tparamsRef], Array[Repr$tparamsRef]] = $C.instance[Array[Type$tparamsRef], Array[Repr$tparamsRef]]""".stripMargin
 
     // Generate the source code
-    val source = s"""
-      |type $nameStr$tparamsDecl = $nameStr.Type$tparamsRef
-      |object $nameStr {
-      |  type Repr$tparamsDecl = $reprTypeStr
-      |  type Base$tparamsDecl = $baseType
-      |  trait Tag$tparamsDecl extends Any
-      |  type Type$tparamsDecl <: Base$tparamsRef & Tag$tparamsRef
-      |
-      |  def apply$tparamsDecl($reprNameStr: $reprTypeStr): Type$tparamsRef = $reprNameStr.asInstanceOf[Type$tparamsRef]
-      |$unapplyCode
-      |$coercibleImplicits
-      |$opsCode
-      |$derivingCode
-      |$derivingKCode
-      |}""".stripMargin
+    val source =
+      s"""
+         |type $nameStr$tparamsDecl = $nameStr.Type$tparamsRef
+         |object $nameStr {
+         |  type Repr$tparamsDecl = $reprTypeStr
+         |  type Base$tparamsDecl = $baseType
+         |  trait Tag$tparamsDecl extends Any
+         |  type Type$tparamsDecl <: Base$tparamsRef & Tag$tparamsRef
+         |
+         |  def apply$tparamsDecl($reprNameStr: $reprTypeStr): Type$tparamsRef = $reprNameStr.asInstanceOf[Type$tparamsRef]
+         |$unapplyCode
+         |$coercibleImplicits
+         |$opsCode
+         |$derivingCode
+         |$derivingKCode
+         |}""".stripMargin
 
     if params.debug then
-      println(s"[newtype-compat] Generated source for @${if params.isSubtype then "newsubtype" else "newtype"} $nameStr:")
+      println(
+        s"[newtype-compat] Generated source for @${if params.isSubtype then "newsubtype" else "newtype"} $nameStr:"
+      )
       source.linesIterator.foreach(line => println(s"[newtype-compat]   $line"))
 
     // Parse the generated source code into untyped trees, then splice the companion's body
@@ -221,7 +225,7 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
     // for nested objects and produces source that won't reparse).
     val stats = parseStats(source)
     companionOpt match
-      case None => stats
+      case None            => stats
       case Some(companion) =>
         val companionTermName = name.toTermName
         stats.map {
@@ -233,30 +237,39 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
             val mergedImpl = cpy.Template(md.impl)(
               parents = if companion.impl.parents.nonEmpty then companion.impl.parents else md.impl.parents,
               derived = if companion.impl.derived.nonEmpty then companion.impl.derived else md.impl.derived,
-              self    = if companion.impl.self != md.impl.self then companion.impl.self else md.impl.self,
-              body    = md.impl.body ++ companion.impl.body
+              self = if companion.impl.self != md.impl.self then companion.impl.self else md.impl.self,
+              body = md.impl.body ++ companion.impl.body
             )
             untpd.ModuleDef(md.name, mergedImpl).withMods(md.mods).withSpan(md.span)
           case other => other
         }
 
   private def buildOpsCodeFromMethods(
-    nameStr: String, reprNameStr: String, reprTypeStr: String,
-    methods: List[Tree], tparams: List[TypeDef]
+      nameStr: String,
+      reprNameStr: String,
+      reprTypeStr: String,
+      methods: List[Tree],
+      tparams: List[TypeDef]
   )(using Context): String =
-    val tparamsDecl = if tparams.isEmpty then "" else {
+    val tparamsDecl = if tparams.isEmpty then ""
+    else {
       s"[${tparams.map(tp => tp.name.toString).mkString(", ")}]"
     }
     val tparamsRef = tparamsDecl
 
     val methodStrs = methods.map {
       case dd: DefDef =>
-        val methodParams = dd.paramss.map { paramClause =>
-          paramClause.map {
-            case vd: ValDef => s"${vd.name}: ${plain(vd.tpt)}"
-            case td: TypeDef => plain(td)
-          }.mkString(", ")
-        }.map(p => s"($p)").mkString
+        val methodParams = dd.paramss
+          .map { paramClause =>
+            paramClause
+              .map {
+                case vd: ValDef  => s"${vd.name}: ${plain(vd.tpt)}"
+                case td: TypeDef => plain(td)
+              }
+              .mkString(", ")
+          }
+          .map(p => s"($p)")
+          .mkString
         val retType = if dd.tpt.isEmpty then "" else s": ${plain(dd.tpt)}"
         val body = rewriteBodyStr(dd.rhs, reprNameStr, reprTypeStr)
         s"    def ${dd.name}$methodParams$retType = $body"
@@ -277,10 +290,10 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
        |$members
        |  }""".stripMargin
 
-  /** Rewrite method body: replace bare references to the constructor param with
-   *  `$this$.asInstanceOf[ReprType]`. Done at the tree level — only `Ident(reprName)`
-   *  is replaced. Member selections like `Select(_, reprName)` (e.g. `Refined.value`
-   *  when the param is also named `value`) are intentionally left alone. */
+  /** Rewrite method body: replace bare references to the constructor param with `$this$.asInstanceOf[ReprType]`. Done
+    * at the tree level — only `Ident(reprName)` is replaced. Member selections like `Select(_, reprName)` (e.g.
+    * `Refined.value` when the param is also named `value`) are intentionally left alone.
+    */
   private def rewriteBodyStr(body: Tree, reprNameStr: String, reprTypeStr: String)(using Context): String =
     val sentinel = "__newtype_repr_reference_sentinel__"
     val rewriter = new UntypedTreeMap:
@@ -305,7 +318,7 @@ class NewTypeTreeTransformer extends UntypedTreeMap:
     // The parser returns a PackageDef; extract its stats
     val stats = tree match
       case PackageDef(_, stats) => stats
-      case _ => List(tree)
+      case _                    => List(tree)
     // Strip positions to avoid confusing the compiler when trees from virtual sources
     // are inserted into the real source's tree
     stats.map(stripPositions)

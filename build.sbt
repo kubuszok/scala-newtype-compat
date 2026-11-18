@@ -62,9 +62,9 @@ val jdkFutureProofSettings = Seq(
       val minor = parts(1).toInt
       val patch = parts(2).takeWhile(_.isDigit).toInt
       val out =
-        if (minor >= 8) "17"                    // 3.8+ require JDK 17
+        if (minor >= 8) "17" // 3.8+ require JDK 17
         else if (minor == 3 && patch >= 8) "11" // 3.3.8+: -Yfuture-lazy-vals needs output >= 9
-        else "8"                                // 3.3.0-3.3.7 and 3.4-3.7: widest floor
+        else "8" // 3.3.0-3.3.7 and 3.4-3.7: widest floor
       val base = Seq("-java-output-version", out)
       if (minor == 3 && patch >= 8) "-Yfuture-lazy-vals" +: base else base
     }
@@ -145,9 +145,9 @@ lazy val tests = project
       (Test / compile).value
     },
     libraryDependencies ++= Seq(
-      "org.scalatest"  %% "scalatest"  % "3.2.20" % Test,
+      "org.scalatest" %% "scalatest" % "3.2.20" % Test,
       "org.scalacheck" %% "scalacheck" % "1.20.0" % Test,
-      "org.typelevel"  %% "cats-core"  % "2.13.0" % Test,
-      "eu.timepit"     %% "refined"    % "0.11.4" % Test
+      "org.typelevel" %% "cats-core" % "2.13.0" % Test,
+      "eu.timepit" %% "refined" % "0.11.4" % Test
     )
   )

@@ -6,8 +6,8 @@ import io.estatico.newtype.macros.newtype
 import io.estatico.newtype.macros.pkgobj.Pagination.{Page, PageSize}
 
 final case class Pagination(
-  page: Page = Page(0L),
-  pageSize: PageSize = PageSize(10L),
+    page: Page = Page(0L),
+    pageSize: PageSize = PageSize(10L)
 ) {
   def offset: Long = page.value * pageSize.value
 

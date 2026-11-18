@@ -12,8 +12,7 @@ class NewTypePluginPhase extends PluginPhase:
 
   override def runOn(units: List[CompilationUnit])(using ctx: Context): List[CompilationUnit] =
     val transformer = new NewTypeTreeTransformer
-    for unit <- units do
-      unit.untpdTree = transformer.transform(unit.untpdTree)(using ctx.withSource(unit.source))
+    for unit <- units do unit.untpdTree = transformer.transform(unit.untpdTree)(using ctx.withSource(unit.source))
     units
 
   override def run(using Context): Unit = ()
