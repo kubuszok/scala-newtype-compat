@@ -4,11 +4,11 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.Context
 
 case class NewTypeParams(
-  optimizeOps: Boolean = true,
-  unapply: Boolean = false,
-  debug: Boolean = false,
-  debugRaw: Boolean = false,
-  isSubtype: Boolean = false
+    optimizeOps: Boolean = true,
+    unapply: Boolean = false,
+    debug: Boolean = false,
+    debugRaw: Boolean = false,
+    isSubtype: Boolean = false
 )
 
 object AnnotationParams:
@@ -18,13 +18,13 @@ object AnnotationParams:
     val base = NewTypeParams(isSubtype = isSubtype)
     extractArgs(annotation) match
       case Some(args) => parseArgs(base, args)
-      case None => base
+      case None       => base
 
   private def extractArgs(tree: Tree): Option[List[Tree]] = tree match
-    case New(_)              => Some(Nil)
-    case Apply(_, args)      => Some(args)
-    case Select(inner, _)    => extractArgs(inner)
-    case _                   => None
+    case New(_)           => Some(Nil)
+    case Apply(_, args)   => Some(args)
+    case Select(inner, _) => extractArgs(inner)
+    case _                => None
 
   private def parseArgs(base: NewTypeParams, args: List[Tree]): NewTypeParams =
     args.foldLeft(base) { (params, arg) =>
@@ -49,8 +49,8 @@ object AnnotationParams:
     }
 
   private def annotationName(tree: Tree): Option[String] = tree match
-    case New(Ident(name))              => Some(name.toString)
-    case New(Select(_, name))          => Some(name.toString)
-    case Apply(inner, _)               => annotationName(inner)
-    case Select(inner, _)              => annotationName(inner)
-    case _                             => None
+    case New(Ident(name))     => Some(name.toString)
+    case New(Select(_, name)) => Some(name.toString)
+    case Apply(inner, _)      => annotationName(inner)
+    case Select(inner, _)     => annotationName(inner)
+    case _                    => None

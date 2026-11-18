@@ -113,7 +113,8 @@ object NewTypeMacrosTest {
 
   @newtype case class Foo(x: Int)
 
-  @io.estatico.newtype.macros.newtype case class QualifiedFoo(value: String)
+  @io.estatico.newtype.macros.newtype
+  case class QualifiedFoo(value: String)
 
   @newtype case class Baz[A](xs: List[A])
 
@@ -132,5 +133,6 @@ object NewTypeMacrosTest {
 
   @newsubtype case class Sub(x: Int)
 
-  @io.estatico.newtype.macros.newsubtype case class QualifiedSub(x: Int)
+  @io.estatico.newtype.macros.newsubtype
+  case class QualifiedSub(x: Int)
 }
