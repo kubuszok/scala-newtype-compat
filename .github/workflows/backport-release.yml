@@ -54,6 +54,12 @@ jobs:
         with:
           jvm: "temurin:1.17.0.15"
           apps: sbt
+      - name: Make `sbt` run in the foreground (sbt 2 thin client starts a background server)
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/sbt-foreground"; mkdir -p "$dir"
+          printf '#!/usr/bin/env bash\nexec "%s" --server "$@"\n' "$(command -v sbt)" > "$dir/sbt"
+          chmod +x "$dir/sbt"; echo "$dir" >> "$GITHUB_PATH"
       - name: Test and publish the plugin
         # Fail fast unless the checkout is clean and exactly at the tag: that is when the git-derived
         # version equals the tag (otherwise it would be a -SNAPSHOT). Checked with git directly, as

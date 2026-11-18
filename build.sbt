@@ -92,7 +92,6 @@ addCommandAlias("testAll", "+testFull")
 addCommandAlias("publishLocalAll", "+publishLocal")
 
 lazy val compat = project
-  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(
     name := "newtype-compat",
@@ -103,7 +102,6 @@ lazy val compat = project
   )
 
 lazy val plugin = project
-  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(jdkFutureProofSettings)
   .settings(
@@ -116,12 +114,16 @@ lazy val plugin = project
 
 lazy val tests = project
   .dependsOn(compat)
-  .enablePlugins(KubuszokRootPlugin)
   .settings(publishSettings)
   .settings(noPublishSettings)
   .settings(jdkFutureProofSettings)
   .settings(
     name := "newtype-compat-tests",
+    // `+` (in `ci-release` and `testAll`) switches only the projects that list a version, so tests can be on a
+    // Scala 3 version compat does not cross-build for while compat still holds 2.13 from an earlier step
+    // ("Scala version mismatch: tests (Scala 3.10.0) depends on compat (Scala 2.13.18)"). compat has no sources
+    // (it only adds newtype_2.13), so its classpath does not depend on its Scala version.
+    allowMismatchScala := true,
     crossScalaVersions := scala2_13 +: scala3Versions,
     scalaVersion := scala3Latest,
     scalacOptions ++= {
