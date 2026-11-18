@@ -1,12 +1,19 @@
 name: Sonatype Release
 
 on:
+  pull_request:
+    branches: [master]
   push:
     branches: [master]
     tags: ["*"]
 
 jobs:
   release-tag:
+    # PR snapshots let a change be tested before merging. Bot (Dependabot, Scala Steward) and fork PRs get no
+    # secrets, so only trusted authors' PRs publish. Never drop this guard while `pull_request` is a trigger.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
 
     name: ${{ startsWith(github.ref, 'refs/tags/') && 'Publish Tag as Release' || 'Publish Snapshot' }}
@@ -25,15 +32,16 @@ jobs:
         with:
           jvm: "temurin:1.17.0.15"
           apps: sbt
+      - name: Make `sbt` run in the foreground (sbt 2 thin client starts a background server)
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/sbt-foreground"; mkdir -p "$dir"
+          printf '#!/usr/bin/env bash\nexec "%s" --server "$@"\n' "$(command -v sbt)" > "$dir/sbt"
+          chmod +x "$dir/sbt"; echo "$dir" >> "$GITHUB_PATH"
       - name: Publish all projects
-        # `+publishSigned` cross-publishes every version in crossScalaVersions (all Scala 3
-        # versions for the plugin, 2.13 + 3 for compat). The plugin's `ci-release` command runs
-        # a bare `publishSigned`, which only publishes each module's default scalaVersion.
-        # On a tag, also release the staged Sonatype bundle.
-        # NB: sbt 2.0 joins multiple program args into ONE command line, so `sbt "+publishSigned"
-        # sonaRelease` became the invalid `+publishSigned sonaRelease` ("Expected ';'"). Pass a
-        # single, `;`-separated command instead.
-        run: sbt "+publishSigned${{ startsWith(github.ref, 'refs/tags/') && '; sonaRelease' || '' }}"
+        # sbt-kubuszok's `ci-release`: `+publishSigned` (every crossScalaVersions entry: all Scala 3 versions for
+        # the plugin, 2.13 + 3 for compat), then `sonaRelease` when HEAD is tagged.
+        run: sbt ci-release
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
