@@ -6,7 +6,7 @@ scala-newtype provides `@newtype` and `@newsubtype` macro annotations for zero-c
 
 ## Status
 
-Work in progress. Tested on Scala 2.13.16 and all Scala 3 versions from 3.3.0 to 3.10.0.
+Work in progress. Tested on Scala 2.13.18 and all Scala 3 versions from 3.3.0 to 3.10.1.
 
 ## Setup
 
